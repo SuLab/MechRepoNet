@@ -178,3 +178,46 @@ def expand_col_on_char(df, col_name, char):
     return df_out.drop('old_idx', axis=1)[col_order]
 
 
+def map_to_parent(df, parent_map, col_name):
+    """Map a column to its parent value"""
+    df_out = df.copy()
+    out_name = 'parent_'+col_name
+    df_out[out_name] = df_out[col_name].map(parent_map)
+    return df_out
+
+
+def make_parent_map(df, child_id_col, parent_id_col, name_col):
+    """
+    Takes dataframe with identifiers for parent and child, and name for child and produces a map dict from
+    child name to parent name
+    """
+    map_df = pd.merge(df, df[[name_col, child_id_col]], how='left', left_on=parent_id_col, right_on=child_id_col,
+                      suffixes=('', '_parent'))
+
+    par_name_col = name_col+'_parent'
+    # Fills in root nodes with its own name
+    map_df[par_name_col] = map_df[par_name_col].fillna(map_df[name_col])
+    return map_df.set_index(name_col)[par_name_col].to_dict()
+
+def prepend_direction_to_map(mapper, directions=iter(()), char=''):
+    """
+    In a dict, will prepend all elements of `directions` to all keys and values, sparated by `char`
+
+    e.g. a dict of  {'metabolic processing': 'metabolic processing',
+                     'acetylation': 'metabolic processing'}
+    And directions ['increasing', 'decreasing'] with char '^'
+
+    becomes:
+         {'increases^metabolic processing': 'increases^metabolic processing',
+          'increases^acetylation': 'increases^metabolic processing',
+          'decreases^metabolic processing': 'decreases^metabolic processing',
+          'decreases^acetylation': 'decreases^metabolic processing'}
+    """
+    out_map = dict()
+    for k, v in mapper.items():
+        for d in directions:
+            new_k = d+char+k
+            new_v = d+char+v
+            out_map[new_k] = new_v
+    return out_map
+
