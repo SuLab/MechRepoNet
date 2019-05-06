@@ -2,9 +2,12 @@ import os
 import subprocess
 import numpy as np
 import pandas as pd
+from copy import deepcopy
+from itertools import chain
+from collections import defaultdict
 
 def head(file_name, n_lines=20, print_out=True, line_nums=False):
-    """Get the first n_lines lines of a file. Print if print_out=True, else return as list"""
+    """Get the first n_lines lines of a file. Print if print_out=True, else return as list. Works on UNIX systems"""
 
     assert type(n_lines) == int
     n_lines = str(n_lines)
@@ -199,6 +202,7 @@ def make_parent_map(df, child_id_col, parent_id_col, name_col):
     map_df[par_name_col] = map_df[par_name_col].fillna(map_df[name_col])
     return map_df.set_index(name_col)[par_name_col].to_dict()
 
+
 def prepend_direction_to_map(mapper, directions=iter(()), char=''):
     """
     In a dict, will prepend all elements of `directions` to all keys and values, sparated by `char`
@@ -220,4 +224,151 @@ def prepend_direction_to_map(mapper, directions=iter(()), char=''):
             new_v = d+char+v
             out_map[new_k] = new_v
     return out_map
+
+
+def get_parent_to_child_map(df, parent_col, child_col, sep='|', verbose=False):
+    """
+    Gets a map from the parent ID to IDs of all children (and children of children etc.)
+    Source dataframe (EG, CTD)
+    """
+    # Initialize the map
+    par_to_children = defaultdict(set)
+    expanded = expand_col_on_char(df.dropna(subset=[parent_col]), parent_col, sep)
+
+    # Get mappings from child to local parents
+    for row in expanded.itertuples():
+        par_to_children[getattr(row, parent_col)].add(getattr(row, child_col))
+
+    # Extend the map... parents map to local children, but need mapping to the children of children, too
+    par_to_children = extend_map(par_to_children, verbose)
+
+    # Discard empty values (default_dict will add an empty one when simply accessed)
+    par_to_children = {k: v for k, v in par_to_children.items() if len(v) > 0}
+
+    return par_to_children
+
+
+def extend_map(mapper, verbose=False):
+    """
+    Takes a dict mapper of a tree (e.g. parents to children) a extends down so parents map to all
+    intermediate children, terminating at a leaf.
+    """
+
+    prev_total_mappings = 0
+    total_mappings = len(list(chain(*mapper.values())))
+    num_iter = 0
+    i = 0
+
+    while (total_mappings != prev_total_mappings):
+        prev_total_mappings = len(list(chain(*mapper.values())))
+        current_map = deepcopy(mapper)
+        for k, v in current_map.items():
+            for val in v:
+                mapper[k].update(mapper[val])
+        total_mappings = len(list(chain(*mapper.values())))
+
+
+        if verbose:
+            num_iter += total_mappings
+            # Print an update every 10 Million iterations (approx)
+            if i == 0 or np.floor(num_iter / 1e7) - np.floor((num_iter - total_mappings) / 1e7) > 0:
+                print('Iter: {}, Total Mappings: {:,}'.format(i, total_mappings))
+        i += 1
+
+    return mapper
+
+
+def char_combine_col(col, char='|'):
+    """
+    Converts a column to a cell, splitting elements within that column along a character, dedupcating all elements,
+    then joining across that character on that charcter.
+
+    e.g. 1   "123456|102934"
+         2   "123456"
+         3   "102934|432452"
+         4   "201945"
+
+         becomes:
+            "123456|102934|432452|201945"
+    """
+    elems = []
+    for elem in col:
+        elems += str(elem).split(char)
+    return char.join(list(set(elems)))
+
+
+def char_combine_dataframe_rows(df, char='|'):
+    return df.apply(lambda col: char_combine_col(col, char))
+
+
+def combine_group_rows_on_char(df, group_on, combine_cols=None, char='|'):
+    """
+    Performs a Groupby on a dataframe and then converts each group into a single row, joinned by a character `char`
+
+    Primarly suppports grouping on columns, other methods have not been tested.
+
+    :param df:  The dataframe to group
+    :param group_on: the column name or list of column names to group by
+    :param combine_cols: a list of column names to combine with a character, if None, will combine all columns.
+        can save computation time to provide only the columns of interest for combination
+    :param char: the character to combine the columns with. Defaults to a `|` character.
+
+    :return: Dataframe with 1 row per group, and information of different rows joined by given character.
+
+    """
+    col_order = df.columns
+
+    if type(group_on) in (str, int, float):
+        group_on = [group_on]
+
+    grouped = df.groupby(group_on)
+
+    if combine_cols is None:
+        combine_cols = find_cols_with_multi_values(grouped)
+
+    out_df = grouped.first()
+    for col in combine_cols:
+        out_df[col] = grouped[col].apply(char_combine_col, char=char)
+
+    return out_df.reset_index()[col_order]
+
+
+def find_cols_with_multi_values(grouped):
+    """
+    In a Pandas Groupby object, determines which columns have more than one value per group
+    """
+    multi_val_cols = (grouped.nunique() > 1).sum()
+    multi_val_cols = multi_val_cols[multi_val_cols > 0].index.tolist()
+    return multi_val_cols
+
+
+def make_child_to_root_map(df, parent_col, child_col, sep='|', verbose=False):
+    """
+    In a dataframe where one column is child identfiers, and another parent,
+    creates a map from child to root.
+    """
+
+    root_concepts = df[df[parent_col].isnull()][child_col].tolist()
+    parent_to_child = get_parent_to_child_map(df, parent_col, child_col, sep, verbose)
+
+    child_to_parent = dict()
+
+    for k, v in parent_to_child.items():
+        for val in v:
+            if k in root_concepts:
+                child_to_parent[val] = k
+
+    for r in root_concepts:
+        child_to_parent[r] = r
+
+    return child_to_parent
+
+
+def convert_abbrev_mapper_to_full(mapper, map_df, abbrev, full):
+    """
+    With a mapping file from abbrev to abbrev, and a datafame that has abbrev to full mappings, produces
+    a mapper from full to full.
+    """
+    abbrev_to_name = map_df.set_index(abbrev)[full].to_dict()
+    return {abbrev_to_name[k]: abbrev_to_name[v] for k, v in mapper.items()}
 
