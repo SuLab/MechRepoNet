@@ -99,7 +99,7 @@ if __name__ == "__main__":
     out_dir = args.out_dir
 
     # Read file directory
-    external_dir = os.path.abspath('../0_data/external')
+    read_dir = os.path.abspath('../0_data/manual')
 
     # Get default output directory if none provided
     if not out_dir:
@@ -112,7 +112,7 @@ if __name__ == "__main__":
         os.makedirs(out_dir, exist_ok=True)
 
     # Read in info on files to download
-    file_data = pd.read_csv(os.path.join(external_dir, 'edge_file_info.csv'))
+    file_data = pd.read_csv(os.path.join(read_dir, 'edge_file_info.csv'))
 
     # Download the files
     for row in file_data.itertuples():
