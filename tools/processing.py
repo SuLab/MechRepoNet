@@ -109,7 +109,7 @@ def regularize_colnames(col_names):
 
 def split_col(col, char):
     """Splits a Series by a characters, into a new series of equal length with each element as a list"""
-    return col.apply(lambda s: s.split(char))
+    return col.apply(lambda s: s.split(char) if type(s) == str else [s])
 
 
 def expand_split_col(col_split):

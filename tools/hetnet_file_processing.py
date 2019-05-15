@@ -17,12 +17,12 @@ def read_ctd(filename, nrows=None):
 
 def read_reactome(filename, nrows=None):
     """Read a reactome mappings file"""
-    df = pd.read_csv(filename, sep='\t', header=None, nrows=nrows)
+    df = pd.read_csv(filename, sep='\t', header=None, nrows=nrows, dtype=str)
     if df.shape[1] == 8:
-        col_names = ['external_id', 'pe_reactome_id', 'pe_name', 'reactome_id', 'reactome_url', 'ractome_name', 'evidence', 'taxon']
+        col_names = ['external_id', 'pe_reactome_id', 'pe_name', 'reactome_id', 'reactome_url', 'reactome_name', 'evidence_code', 'taxon']
         df.columns = col_names
     elif df.shape[1] == 6:
-        col_names = ['external_id', 'reactome_id', 'reactome_url', 'ractome_name', 'evidence', 'taxon']
+        col_names = ['external_id', 'reactome_id', 'reactome_url', 'reactome_name', 'evidence_code', 'taxon']
         df.columns = col_names
 
     return df
