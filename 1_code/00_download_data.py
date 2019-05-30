@@ -35,7 +35,8 @@ def is_text(url, content_type=None):
     # Allow user to skip step if content type already retrevied
     if content_type is None:
         content_type = get_content_type(url)
-    if "text" in content_type:
+    # some text files have no content type header
+    if content_type is None or "text" in content_type:
         return True
     return False
 
