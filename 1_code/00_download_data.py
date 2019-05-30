@@ -85,6 +85,27 @@ def download_ftp(url, out_name):
     ftp.quit()
 
 
+def download_stitcher():
+    """
+    Download all of the ncats inxight drugs database
+    """
+    url = "https://stitcher.ncats.io/api/stitches/v1?top=100&skip={}"
+    skip = 0
+    contents = []
+    t = tqdm(total=102012 / 100)
+    while True:
+        t.update()
+        d = requests.get(url.format(skip)).json()
+        if not d['contents']:
+            break
+        contents.extend(d['contents'])
+        skip += 100
+        time.sleep(1)
+    with open("stitcher_dump_{}.pkl".format(datetime.datetime.now().strftime("%Y-%m-%d")), "wb") as f:
+        pickle.dump(contents, f)
+    return contents
+
+
 if __name__ == "__main__":
     # Get command-line arguments
     parser = argparse.ArgumentParser(description='Download Files Needed for HetNet Building')
