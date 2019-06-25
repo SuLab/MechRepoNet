@@ -1,8 +1,11 @@
 import os
+import pickle
+import datetime
 import subprocess
 import numpy as np
 import pandas as pd
 from copy import deepcopy
+from pathlib import Path
 from itertools import chain
 from collections import defaultdict
 
@@ -145,6 +148,19 @@ def expand_split_col(col_split):
             new_col.append(item)
 
     return pd.DataFrame({'old_idx': old_idx, col_name: new_col})
+
+
+def expand_df_on_col(df, col_name):
+    df_out = df.copy()
+    # ensure all elements are lists, not just a subset.
+    df_out[col_name] = df_out[col_name].apply(lambda e: [e] if type(e) != list else e)
+    exp_col = expand_split_col(df_out[col_name])
+
+    col_order = df_out.columns
+    df_out = df_out.reset_index()
+    df_out = df_out.rename(columns={'index': 'old_idx'})
+    df_out = pd.merge(df_out.drop(col_name, axis=1), exp_col, on='old_idx', how='outer')
+    return df_out.drop('old_idx', axis=1)[col_order]
 
 
 def expand_col_on_char(df, col_name, char):
@@ -374,3 +390,25 @@ def convert_abbrev_mapper_to_full(mapper, map_df, abbrev, full):
     abbrev_to_name = map_df.set_index(abbrev)[full].to_dict()
     return {abbrev_to_name[k]: abbrev_to_name[v] for k, v in mapper.items()}
 
+
+
+def load_api_results(res_file_name, re_scrape=False, scrape_function=lambda **f: None, **kwargs):
+    """
+    Loads results from an api query. If file does not exit, or rescrape is true, and an api function is passed,
+    The API will rescrape the data.
+    """
+
+
+    dump_files = list(Path.cwd().glob(res_file_name.format('*')))
+    if len(dump_files) < 1 or re_scrape:
+        # Scrape (or re-scrape) the  API and save
+        res = scrape_function(**kwargs)
+
+        if res:
+            with open(res_file_name.format(datetime.datetime.now().strftime("%Y-%m-%d")), 'wb') as f_out:
+                pickle.dump(res, f_out)
+    else:
+        # Load the most recent previously saved dump
+        dump_file = sorted(dump_files, reverse=True)[0]
+        res = pickle.load(open(dump_file, 'rb'))
+    return  res
