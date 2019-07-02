@@ -1,5 +1,6 @@
 import shlex
 import pandas as pd
+from queue import Queue
 from collections import defaultdict
 
 
@@ -235,3 +236,162 @@ def get_ontology_edges(obo_file, prefix=None):
 
 
     return pd.DataFrame(edges)[['src_id', 'src_name', 'rel_type', 'tgt_id', 'tgt_name']]
+
+
+def get_lineage(edges, nid, c2p_rel='is_a', rel_col='rel_type', c_col='src_id', p_col='tgt_id'):
+    """
+    Get the ancestors of a node in an ontology. Include the node itself in the result.
+
+    :param edges: DataFrame, edges in the ontology. See `get_ontology_edges` method.
+    :param nid: str, the identifier for the node to get ancestors of.
+    :param direct_only: bool, if `True` returns only direct children of the given node.
+    :param c2p_rel: str, the name for the relation that links a parent to a child.
+        if only Child to Parent edges, reverse the c_col and p_col variables...
+    :param rel_col: str, the name of the DataFrame column that contains the relationship types (predicates)
+    :param c_col: str, the name of the DataFrame column that contains Children in the relationship
+    :param p_col: str, the name of the DataFrame column that contains PARENTS in the relationship
+
+    :return: set, all parents, and parents of parents up to the root node.
+    """
+    # Set initial Conditions
+    prev_ancestors = 0
+    ancestors = {nid}
+
+    # Reduce the amount of items being queried...
+    sub_q = edges.query('{} == @c2p_rel'.format(rel_col))
+
+    # Only when no new elements added kick out of loop
+    while len(ancestors) != prev_ancestors:
+        # Store the preious amount for end condition check.
+        prev_ancestors = len(ancestors)
+
+        # Query for all parents of current ancestors...
+        ancestors.update(sub_q.query('{} in @ancestors'.format(c_col))[p_col].unique())
+
+    return ancestors
+
+
+def get_children(edges, nid, only_direct=False, c2p_rel='is_a', rel_col='rel_type', c_col='src_id', p_col='tgt_id'):
+    """
+    Get the decendents of a node in an ontology.
+
+    :param edges: DataFrame, edges in the ontology. See `get_ontology_edges` method.
+    :param nid: str, the identifier for the node to get children of.
+    :param direct_only: bool, if `True` returns only direct children of the given node.
+    :param c2p_rel: str, the name for the relation that links a parent to a child.
+        if only Child to Parent edges, reverse the c_col and p_col variables...
+    :param rel_col: str, the name of the DataFrame column that contains the relationship types (predicates)
+    :param c_col: str, the name of the DataFrame column that contains Children in the relationship
+    :param p_col: str, the name of the DataFrame column that contains PARENTS in the relationship
+
+    :return: set, all children of the given node, down to leaf nodes.
+    """
+    # Set initial Conditions
+    prev_children = 0
+    children = {nid}
+
+    # Reduce the amount of items being queried...
+    sub_q = edges.query('{} == @c2p_rel'.format(rel_col))
+
+    # Only get the direct decendents
+    if only_direct:
+        return set(sub_q.query('{} in @children'.format(p_col))[c_col].unique())
+
+    # Only when no new elements added kick out of loop
+    while len(children) != prev_children:
+        # Store the preious amount for end condition check.
+        prev_children = len(children)
+
+        # Query for all children of current children...
+        children.update(sub_q.query('{} in @children'.format(p_col))[c_col].unique())
+
+    # A node is not a child of itself...
+    children.remove(nid)
+    return children
+
+
+def get_relation_map(edges, relation, c2p_rel='is_a', rel_col='rel_type', c_col='src_id', p_col='tgt_id'):
+    """
+    Make a dictionary from a given node in ontology to either the root or leaves.
+
+    :param edges: DataFrame, edges in the ontology. See `get_ontology_edges` method.
+    :param relation: str, either `'descendents'` or `'ancestors'`, determines wheather to look up or down the tree.
+    :param c2p_rel: str, the name for the relation that links a parent to a child.
+        if only Child to Parent edges, reverse the c_col and p_col variables...
+    :param rel_col: str, the name of the DataFrame column that contains the relationship types (predicates)
+    :param c_col: str, the name of the DataFrame column that contains Children in the relationship
+    :param p_col: str, the name of the DataFrame column that contains PARENTS in the relationship
+
+    :return: dict, map from a node to either the root or leaf nodes depending on `relation`.
+    """
+    # Make sure we're mapping to either ancestors or descendents
+    assert relation in ['descendents', 'ancestors']
+
+    if relation == 'descendents':
+        # Descendents map from parent to child
+        from_col = p_col
+        to_col = c_col
+    else:
+        # Ancestors map from child to parent
+        from_col = c_col
+        to_col = p_col
+
+    # Initialize variables and reduce search space
+    adj_map = defaultdict(set)
+    q = Queue()
+    sub_q = edges.query('{} == @c2p_rel'.format(rel_col))
+
+    # Build the adjecny list
+    for row in sub_q.itertuples():
+        start = getattr(row, from_col)
+        end = getattr(row, to_col)
+
+        adj_map[start].add(end)
+
+    # Perfrom a BFS on the adjcency list to generate the map
+    out = defaultdict(set)
+    for start, ends in adj_map.items():
+        out[start] = ends
+        for end in ends:
+            q.put(end)
+
+        while not q.empty():
+            relative = q.get()
+            new = adj_map.get(relative, set()) - out[start]
+            for n in new:
+                q.put(n)
+                out[start].add(n)
+
+    return out
+
+
+def get_lineage_map(edges, c2p_rel='is_a', rel_col='rel_type', c_col='src_id', p_col='tgt_id'):
+    """
+    Make a dictionary from a given node in ontology to all parents up to the root node.
+
+    :param edges: DataFrame, edges in the ontology. See `get_ontology_edges` method.
+    :param c2p_rel: str, the name for the relation that links a parent to a child.
+        if only Child to Parent edges, reverse the c_col and p_col variables...
+    :param rel_col: str, the name of the DataFrame column that contains the relationship types (predicates)
+    :param c_col: str, the name of the DataFrame column that contains Children in the relationship
+    :param p_col: str, the name of the DataFrame column that contains PARENTS in the relationship
+
+    :return: dict, map from a node to all parents all the way up to the root node.
+    """
+    return get_relation_map(edges, 'ancestors', c2p_rel, rel_col, c_col, p_col)
+
+
+def get_children_map(edges, c2p_rel='is_a', rel_col='rel_type', c_col='src_id', p_col='tgt_id'):
+    """
+    Make a dictionary from a given node in ontology to all childern and descendets to a leaf nodes.
+
+    :param edges: DataFrame, edges in the ontology. See `get_ontology_edges` method.
+    :param c2p_rel: str, the name for the relation that links a parent to a child.
+        if only Child to Parent edges, reverse the c_col and p_col variables...
+    :param rel_col: str, the name of the DataFrame column that contains the relationship types (predicates)
+    :param c_col: str, the name of the DataFrame column that contains Children in the relationship
+    :param p_col: str, the name of the DataFrame column that contains PARENTS in the relationship
+
+    :return: dict, map from a node to all children of that node, continuing to leaf nodes.
+    """
+    return get_relation_map(edges, 'descendents', c2p_rel, rel_col, c_col, p_col)
