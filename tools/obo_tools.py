@@ -1,3 +1,4 @@
+import json
 import shlex
 import pandas as pd
 from queue import Queue
@@ -196,11 +197,13 @@ def get_ontology_edges(obo_file, prefix=None):
         E.G. prefix='CHEBI:' will not return any edges for Terms starting with 'BFO:'
     :return: DataFrame, cols=['src_id', 'src_name', 'rel_type', 'tgt_id', 'tgt_name']
     """
-    # Initialize edges and Term keys to extract
     edges = list()
     source_info = ['id', 'name']
     edge_lines = ['relationship', 'is_a']
     is_term = False
+    # Just get the names for Relationship ontology terms
+    is_ro_term = False
+    ro_map = dict()
 
     for line in read_lines(obo_file):
         # Terms start with specific Flag...
@@ -211,6 +214,7 @@ def get_ontology_edges(obo_file, prefix=None):
         # Empty lines indicate new terms
         if line == '\n':
             is_term = False
+            is_ro_term = False
             continue
 
         # Get single values
@@ -219,23 +223,115 @@ def get_ontology_edges(obo_file, prefix=None):
         if key in source_info:
             # If we only want one Ontology's worth of terms,
             # ensure that the correct Prefex is on the identifier
-            if prefix and key == 'id':
+            if key == 'id':
                 _id = parse_single_value(line, key)
-                if not _id.startswith(prefix):
+                if _id.startswith('RO:'):
+                    is_ro_term = True
+                elif prefix and not _id.startswith(prefix):
                     is_term = False
                     continue
                 else:
                     term_info['src_'+key] = _id
+            elif is_ro_term and key == 'name':
+                ro_map[_id] = parse_single_value(line, key).replace(' ', '_')
             else:
                 term_info['src_'+key] = parse_single_value(line, key)
 
-        # Extract teh edge specific info
         if key in edge_lines and is_term:
             edge_info = parse_edge_line(line)
             edges.append({**term_info, **edge_info})
 
 
-    return pd.DataFrame(edges)[['src_id', 'src_name', 'rel_type', 'tgt_id', 'tgt_name']]
+    out = pd.DataFrame(edges)[['src_id', 'src_name', 'rel_type', 'tgt_id', 'tgt_name']]
+    ro_edges = out['rel_type'].str.startswith('RO:')
+    ro_edges = ro_edges[ro_edges].index
+
+    out.loc[ro_edges, 'rel_type'] = out.loc[ro_edges, 'rel_type'].map(ro_map)
+
+    # Get the ontology prefix for sources and targets
+    out['src_src'] = out['src_id'].str.split(':', expand=True)[0]
+    out['tgt_src'] = out['tgt_id'].str.split(':', expand=True)[0]
+
+    return out
+
+
+def parse_meta(meta):
+    if pd.isnull(meta):
+        return meta
+
+    out = dict()
+
+    for k, v in meta.items():
+        if k in ['subsets', 'comments']:
+            out[k] = '|'.join(values.split('#')[-1] for values in v)
+
+        elif k == 'basicPropertyValues':
+            for prop_val in v:
+                prop = prop_val['pred'].split('#')[-1].split('/')[-1].replace('_', ':')
+                val = prop_val['val']
+                out[prop] = val
+
+        elif type(v) == dict:
+            out[k] = v['val']
+
+        elif type(v) == bool:
+            out[k] = v
+
+        else:
+            out[k] = '|'.join([values['val'] for values in v])
+
+    return out
+
+
+def parse_uri(uri):
+    return uri.split('/')[-1].replace('_', ':')
+
+
+def get_go_nodes_and_edges(go_json_file):
+    go = json.load(open(go_json_file, 'r'))
+    go = go['graphs'][0]
+
+    go_nodes = go['nodes']
+    go_edges = go['edges']
+
+    go_nodes = pd.DataFrame(go_nodes)
+    go_edges = pd.DataFrame(go_edges)
+
+    go_nodes['short_id'] = go_nodes['id'].apply(lambda i: i.split('/')[-1].replace('_', ':'))
+    go_nodes['id_src'] = go_nodes['short_id'].str.split(':', expand=True)[0]
+    go_nodes['id_src'].unique()
+
+    parsed = go_nodes['meta'].apply(parse_meta).dropna()
+    meta = pd.DataFrame(parsed.tolist(), parsed.index)
+
+    col_order = go_nodes.columns.tolist() + \
+                ['xrefs', 'deprecated', 'date', 'definition', 'subsets', 'synonyms']
+    col_order += [c for c in meta.columns if c not in col_order]
+
+    go_nodes = pd.merge(go_nodes, meta, how='outer', left_index=True, right_index=True)[col_order].drop('meta', axis=1)
+
+    rel_types = ['BFO', 'BSPO', 'GOREL', 'RO']
+    rel_map = go_nodes.query('id_src == @rel_types').set_index('short_id')['lbl'].str.replace(' ', '_').to_dict()
+
+    go_edges['rel_type'] = go_edges['pred'].str.split('#', expand=True)[1].dropna()
+
+    rels = go_edges['pred'].str.split('/', expand=True)[4].str.replace('_', ':').map(rel_map)
+    go_edges['rel_type'] = go_edges['rel_type'].fillna(rels)
+
+    go_edges['rel_type'] = go_edges['rel_type'].fillna(go_edges['pred'])
+    id_to_name = go_nodes.set_index('short_id')['lbl'].to_dict()
+
+    go_edges['src_id'] = go_edges['sub'].apply(parse_uri)
+    go_edges['src_src'] = go_edges['src_id'].str.split(':', expand=True)[0]
+    go_edges['src_name'] = go_edges['src_id'].map(id_to_name)
+    go_edges['tgt_id'] = go_edges['obj'].apply(parse_uri)
+    go_edges['tgt_src'] = go_edges['tgt_id'].str.split(':', expand=True)[0]
+    go_edges['tgt_name'] = go_edges['tgt_id'].map(id_to_name)
+
+    go_nodes = go_nodes.drop('id', axis=1).rename(columns={'short_id': 'id', 'lbl': 'name'})
+    go_edges = go_edges.drop(['obj', 'pred', 'sub'], axis=1)
+
+    return go_nodes, go_edges
 
 
 def get_lineage(edges, nid, c2p_rel='is_a', rel_col='rel_type', c_col='src_id', p_col='tgt_id'):
