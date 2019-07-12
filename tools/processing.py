@@ -1,4 +1,5 @@
 import os
+import re
 import pickle
 import datetime
 import subprocess
@@ -8,6 +9,13 @@ from copy import deepcopy
 from pathlib import Path
 from itertools import chain
 from collections import defaultdict
+
+NONALNUM_PATTERN = re.compile('[\W_]+')
+
+
+def strip_chars(string):
+    return NONALNUM_PATTERN.sub('', string)
+
 
 def head(file_name, n_lines=20, print_out=True, line_nums=False):
     """Get the first n_lines lines of a file. Print if print_out=True, else return as list. Works on UNIX systems"""
