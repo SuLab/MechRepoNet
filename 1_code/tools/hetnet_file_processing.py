@@ -1,6 +1,14 @@
 import os
 import pandas as pd
+from copy import deepcopy
+from inflection import singularize
 from .processing import head, regularize_colnames
+
+
+CHEM_XREF_KEY_ORDER = ['UNII', 'DRUGBANK', 'MESH', 'CHEMBL.COMPOUND',  'PUBCHEM', 'CompoundCID',
+                       'InChIKey', 'NDF-RT', 'RXCUI', 'NCI_THESAURUS', 'CAS', 'IUPHAR',
+                       'Iupac', 'KeggId', 'SMILES']
+
 
 def read_ctd(filename, nrows=None):
     """Read in a file from CTD"""
@@ -133,7 +141,7 @@ def records_to_treats_edges(records):
 
 def records_to_target_edges(records):
 
-    out = extract_edges_from_records(data, 'targets', ['ids', 'pharmas'], is_empty_target)
+    out = extract_edges_from_records(records, 'targets', ['ids', 'pharmas'], is_empty_target)
 
     return out.rename(columns={'id': 'target_id', 'pharma': 'interaction'})
 
@@ -196,3 +204,21 @@ def process_chembl_targets_api(chembl_results):
                     this_xref[xk] = str(xr[xk])
                 target_xrefs.append(deepcopy(this_xref))
     return pd.DataFrame(target_xrefs)
+
+
+def select_chembl_target_xref(chembl_target_df):
+    # Only get the following xrefs for chembl targets
+    chembl_protein_xrefs = ['EnsemblGene', 'UniProt']
+    non_protein_target_types = ['ORGANISM','CELL-LINE','NUCLEIC-ACID','METAL','SMALL MOLECULE',
+                                'SUBCELLULAR','UNKNOWN','MACROMOLECULE']
+
+    # Filter by the xrefs
+    chembl_info = (chembl_target_df.query('xref_src_db in @chembl_protein_xrefs')
+                                   .sort_values('xref_src_db')
+                                   .drop_duplicates(subset=['component_id', 'target_chembl_id'])
+                                   .sort_index())
+    # Add back in the non-protein targets
+    chembl_info = pd.concat([chembl_info, chembl_target_df.query('target_type in @non_protein_target_types')],
+                            ignore_index=True)
+
+    return chembl_info

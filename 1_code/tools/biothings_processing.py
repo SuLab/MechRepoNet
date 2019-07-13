@@ -206,13 +206,55 @@ def get_drugcentral_targets(mychem_dump):
     return pd.DataFrame(nodes), pd.DataFrame(edges)
 
 
-def process_chemicals_in_mychem_results(results):
+def process_chemicals_in_mychem_results(results, preferred_id_order=None):
 
+    # Get the important idenitfier and name data
     parsed_mychem = []
     for r in results:
         out = get_xrefs(r)
         out['name'] = get_best_name(r)
         parsed_mychem.append(out)
 
+    # Convert to DataFrame
     chem_node_df = pd.DataFrame(parsed_mychem)
+
+    # Some muti-result per query will be a list, so make a | joined string
+    for c in chem_node_df.columns:
+        chem_node_df[c] = col_lists_to_str(chem_node_df[c])
+
+    # Estabilsh a default ID order
+    if preferred_id_order is None:
+        preferred_id_order = ['ikey', 'unii_id', 'chebi_id', 'drugbank_id', 'mesh_id', 'chembl_id']
+
+    # Choose an id for each node
+    chem_node_df['id'] = float('nan')
+    chem_node_df['source'] = float('nan')
+
+    for o in preferred_id_order:
+        chem_node_df['id'] = chem_node_df['id'].fillna(chem_node_df[o])
+        idx = chem_node_df['id'].dropna().index
+        # Record the source of the ID chose
+        chem_node_df.loc[idx, 'source'] = chem_node_df.loc[idx, 'source'].fillna(o.split('_')[0])
+
     return chem_node_df
+
+
+def make_mg_uniprot_map(mg_res):
+    """
+    Takes a mygene result and makes map from uniprot to entrezgene id.
+
+    In one-to-many uniprot-to-entrez instances, it takes the lowest numbered geneid.
+    """
+    # Some one to many found, so we will de-duplicate
+    uniprot_map = {x['query']: x.get('entrezgene', float('nan')) for x in mg_res['out']}
+
+    # Simple strategy of just taking the lowest numbered cross reference
+    dup_xref = [x[0] for x in mg_res['dup']]
+    for x in mg_res['out']:
+        # Find the duplicated Xrefs... Some may not have an entrezgene, but multiples of other ids, so check
+        if x['query'] in dup_xref and not pd.isnull(uniprot_map[x['query']]):
+            # take the smallest numbered xref....
+            if int(x['entrezgene']) < int(uniprot_map[x['query']]):
+                uniprot_map[x['query']] = x['entrezgene']
+    return uniprot_map
+
