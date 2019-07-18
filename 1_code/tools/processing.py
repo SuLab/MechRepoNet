@@ -320,7 +320,7 @@ def char_combine_col(col, char='|'):
     elems = []
     for elem in col:
         elems += str(elem).split(char)
-    return char.join(list(set(elems)))
+    return char.join(list(set([e for e in elems if e != 'nan'])))
 
 
 def char_combine_dataframe_rows(df, char='|'):
