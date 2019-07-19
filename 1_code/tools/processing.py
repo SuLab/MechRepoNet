@@ -56,7 +56,7 @@ def cammel_to_underscore(name):
     # Ensure first section is grabbed when starting with lower case e.g. cammelCaseExamples
     idx_to_change = [0] + idx_to_change if 0 not in idx_to_change else idx_to_change
 
-    # If strings of caplital letters in a reow (e.g. OrchidIDs)
+    # If strings of caplital letters in a row (e.g. OrchidIDs)
     # Start with only the first of the string and remove the rest...
     prev_idx = 0
     to_remove = []
@@ -71,9 +71,7 @@ def cammel_to_underscore(name):
     for i, start_idx in enumerate(idx_to_change):
         if i+1 < len(idx_to_change):
             end_idx = idx_to_change[i+1]
-            out_name += name[start_idx:end_idx].lower()
-            if start_idx > 0 and name[start_idx-1] != '_':
-                out_name += '_'
+            out_name += name[start_idx:end_idx].lower() + '_'
         else:
             out_name += name[start_idx:].lower()
     if not out_name:

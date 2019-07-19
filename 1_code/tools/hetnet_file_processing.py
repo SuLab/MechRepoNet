@@ -222,3 +222,15 @@ def select_chembl_target_xref(chembl_target_df):
                             ignore_index=True)
 
     return chembl_info
+
+
+def determine_evidence(code):
+    """
+    Computationaly derived codes are taken from GO's webiste:
+    http://geneontology.org/docs/guide-go-evidence-codes/
+
+    :param code: str, 3 (or 2) letter code for annotation evidence.
+    :retrun: str, 'curated' or 'computed' status of the code.
+    """
+    comp_codes = ['ISS', 'ISO', 'ISA', 'ISM', 'IGC', 'RCA', 'IEA']
+    return 'computed' if code.upper() in comp_codes else 'curated'
