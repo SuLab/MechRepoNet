@@ -234,3 +234,4 @@ def determine_evidence(code):
     """
     comp_codes = ['ISS', 'ISO', 'ISA', 'ISM', 'IGC', 'RCA', 'IEA']
     return 'computed' if code.upper() in comp_codes else 'curated'
+
