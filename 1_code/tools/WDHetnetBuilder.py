@@ -1,3 +1,4 @@
+import os
 import json
 from collections import Counter
 from wikidataintegrator.wdi_core import WDItemEngine
@@ -23,9 +24,14 @@ def get_col_order(query_text):
 
 
 def execute_sparql_query(query_text, endpoint='http://avalanche.scripps.edu:9999/bigdata/sparql'):
-    # Enforce the proper column order
+    # Execute the qurey
+    result = WDItemEngine.execute_sparql_query(query_text, endpoint=endpoint, as_dataframe=True)
+    # Don't do any processing if empy result
+    if len(result) == 0:
+        return result
+    # Enforce the proper column order and return
     col_order = get_col_order(query_text)
-    return parse_result_uris(WDItemEngine.execute_sparql_query(query_text, endpoint=endpoint, as_dataframe=True))[col_order]
+    return parse_result_uris(result)[col_order]
 
 
 def generate_instance_tag(name, p, n_id):
@@ -176,10 +182,10 @@ class WDHetnetQueryBuilder:
         self.extend = self._extract_node_key('extend')
 
     def _get_info(self, info):
-        # if fileame for json file give, read the file.
-        if type(info) == str:
-
+        # if fileame for json file is given, read the file.
+        if os.path.isfile(info):
             info = json.load(open(info, 'r'))
+
         return info
 
     def _validate_nodes(self, info):

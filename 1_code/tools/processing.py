@@ -5,6 +5,7 @@ import datetime
 import subprocess
 import numpy as np
 import pandas as pd
+from tqdm.autonotebook import tqdm
 from copy import deepcopy
 from pathlib import Path
 from itertools import chain
@@ -351,8 +352,9 @@ def combine_group_rows_on_char(df, group_on, combine_cols=None, char='|'):
         combine_cols = find_cols_with_multi_values(grouped)
 
     out_df = grouped.first()
-    for col in combine_cols:
-        out_df[col] = grouped[col].apply(char_combine_col, char=char)
+    for col in tqdm(combine_cols, desc='total_progress'):
+        tqdm.pandas(desc=col)
+        out_df[col] = grouped[col].progress_apply(char_combine_col, char=char)
 
     return out_df.reset_index()[col_order]
 

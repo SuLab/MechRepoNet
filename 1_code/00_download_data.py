@@ -119,7 +119,7 @@ if __name__ == "__main__":
     for row in file_data.itertuples():
         out_name = os.path.join(out_dir, row.file_name)
 
-        if os.path.exists(out_name):
+        if os.path.exists(out_name) and not re_download:
             print('File {} exits. Skipping...'.format(row.file_name))
             continue
 

@@ -1,7 +1,11 @@
 import os
+import json
+import time
+import requests
 import pandas as pd
 from copy import deepcopy
 from inflection import singularize
+from tqdm.autonotebook import tqdm
 from .processing import head, regularize_colnames
 
 
@@ -149,7 +153,7 @@ def records_to_target_edges(records):
 def query_chembl(ids, offset, limit):
 
         query_url = 'https://www.ebi.ac.uk/chembl/api/data/target/set/{}?format=json'
-        this_q = query_url.format(';'.join(chembl_targets[offset:offset+limit]))
+        this_q = query_url.format(';'.join(ids[offset:offset+limit]))
         r = requests.get(this_q)
         return json.loads(r.text)['targets']
 

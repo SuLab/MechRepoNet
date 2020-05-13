@@ -93,18 +93,11 @@ def col_lists_to_str(col, c='|'):
     return col.apply(lambda e: join_list_char(e, c))
 
 def make_mg_uniprot_map(mg_res):
-    # Some one to many found, so we will de-duplicate
-    uniprot_map = {x['query']: x.get('entrezgene', float('nan')) for x in mg_res['out']}
+    # Allow 1-many mappings
+    qs = [x['query'] for x in mg_res['out']]
+    rs = [x.get('entrezgene', float('nan')) for x in mg_res['out']]
 
-    # Simple strategy of just taking the lowest numbered cross reference
-    dup_xref = [x[0] for x in mg_res['dup']]
-    for x in mg_res['out']:
-        # Find the duplicated Xrefs... Some may not have an entrezgene, but multiples of other ids, so check
-        if x['query'] in dup_xref and not pd.isnull(uniprot_map[x['query']]):
-            # take the smallest numbered xref....
-            if int(x['entrezgene']) < int(uniprot_map[x['query']]):
-                uniprot_map[x['query']] = x['entrezgene']
-    return uniprot_map
+    return pd.DataFrame({'uniprot_id': qs, 'entrez_id': rs})\
 
 def parse_drugbank_target(res_entry):
 
@@ -172,7 +165,7 @@ def parse_drugcentral_target(res_entry):
     node_fields = ['uniprot.gene_symbol', 'uniprot.swissprot_entry', 'target_name', 'target_class',
                    'organism', 'uniprot.uniprot_id']
     edge_fields = ['uniprot.gene_symbol', 'action_type', 'moa_source', 'moa', 'act_source', 'uniprot.uniprot_id',
-                  'target_name']
+                  'target_name', 'act_type', 'act_value']
 
     for t in dc_targets:
         n_vals = dict()
@@ -224,7 +217,7 @@ def process_chemicals_in_mychem_results(results, preferred_id_order=None):
 
     # Estabilsh a default ID order
     if preferred_id_order is None:
-        preferred_id_order = ['ikey', 'unii_id', 'chebi_id', 'drugbank_id', 'mesh_id', 'chembl_id']
+        preferred_id_order = ['ikey', 'unii_id', 'chebi_id', 'drugbank_id', 'chembl_id', 'mesh_id']
 
     # Choose an id for each node
     chem_node_df['id'] = float('nan')

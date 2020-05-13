@@ -8,6 +8,7 @@ from itertools import chain
 import requests
 from tqdm import tqdm
 from itertools import cycle
+#from processing import load_api_results
 
 # url = "https://stitcher.ncats.io/api/stitches/v1/9ZOQ3TZI87"
 # d = requests.get(url).json()
@@ -28,7 +29,7 @@ def download_stitcher():
     url = "https://stitcher.ncats.io/api/stitches/v1?top=100&skip={}"
     skip = 0
     contents = []
-    t = tqdm(total=98244 / 100)
+    t = tqdm(total=102012 / 100)
     while True:
         t.update()
         d = requests.get(url.format(skip)).json()
@@ -218,3 +219,6 @@ def main():
     with open("stitcher_parsed_{}.pkl".format(datetime.datetime.now().strftime("%Y-%m-%d")), "wb") as f:
         pickle.dump(d, f)
 
+
+if __name__ == '__main__':
+    main()
