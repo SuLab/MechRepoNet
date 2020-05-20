@@ -1,0 +1,18 @@
+hetnet,abbrev,biolink,bl_hierarchy_mapping,hie_abbrev
+Cellular Component,CC,CellularComponent,AnatomicalEntity,A
+Compound,C,ChemicalSubstance,ChemicalSubstance,C
+Complex,X,MacromolecularComplex,MacromolecularMachine,G
+Taxon,T,OrganismTaxon,OrganismTaxon,T
+Biological Process,BP,BiologicalProcess,BiologicalProcessOrActivity,BP
+Anatomy,A,GrossAnatomicalStructure,AnatomicalEntity,A
+Micro RNA,N,RNAProduct,MacromolecularMachine,G
+Drug,R,Drug,ChemicalSubstance,C
+Protein,P,Protein,MacromolecularMachine,G
+Gene,G,Gene,MacromolecularMachine,G
+Disease,D,Disease,Disease,D
+Reaction,RX,PhysiologicalProcess,PhysiologicalProcess,RX
+Phenotype,PH,PhenotypicFeature,PhenotypicFeature,P
+Cell Type,CT,Cell,AnatomicalEntity,A
+Pathway,PW,Pathway,Pathway,PW
+Protein Family,F,GeneFamily,GeneFamily,F
+Molecular Function,MF,MolecularActivity,BiologicalProcessOrActivity,BP
