@@ -4,7 +4,7 @@ from collections import Counter
 from wikidataintegrator.wdi_core import WDItemEngine
 import sys
 sys.path.append('../hetnet-ml/src')
-import graph_tools as gt
+import data_tools.graphs as gt
 
 
 def parse_result_uris(result):
