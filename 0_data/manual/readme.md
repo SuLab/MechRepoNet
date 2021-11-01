@@ -5,4 +5,4 @@ Edges were mapped to a simple hierarchy of edge types.  All general, undirected 
 * `directed` - indicates whether an edge has a general regulatory effect
 * `parent_rel` - a mapping of edges from a directed case to a non-directed case.
 
-These edges are used in identifying mechanistic paths from metapaths in MechRepoNet. This is done following the function highlighted https://github.com/mmayers12/data_tools/blob/master/data_tools/graphs/_metapaths.py#L257 
+These edges are used in identifying mechanistic paths from metapaths in MechRepoNet. This is done following the function highlighted https://github.com/mmayers12/data\_tools/blob/master/data\_tools/graphs/\_metapaths.py#L257 
