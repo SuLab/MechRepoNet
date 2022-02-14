@@ -16,7 +16,8 @@ This repository is organized as follows.
     external      # Data acquired from external sources. Not included, but scripts will provide most
 /1_code           # Contains all code for running the pipeline. Scripts and notebooks are numbered in order they should be run.
     tools         # contains tools for building
-/2_pipeline       #  Output folder for pipeline. Not included with repo
+/2_pipeline       # Output folder for pipeline. Not included with repo
+/3_figures        # Figure outputs for select figures
 /tools            # simlik to /1_code/tools for compatibility with legacy code
 
 ```
