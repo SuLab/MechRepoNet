@@ -3,7 +3,7 @@
 This repository contains the scripts and files required to build the MechRepoNet Network as
 well as build the associated Repositioning Model and perform analysis.
 
-MechRepoNet is fully described in [this preprint publication](https://www.biorxiv.org/content/10.1101/2021.04.15.440028v1.abstract)
+MechRepoNet is fully described in <!--[this preprint publication](https://www.biorxiv.org/content/10.1101/2021.04.15.440028v1.abstract)-->[this preproof publication](https://www.dropbox.com/s/hbby8vfbpdoouex/Bioinfo.-2022-Mayers-Tu.pdf?dl=0).
 
 
 ## Organization
